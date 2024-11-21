@@ -1,0 +1,74 @@
+% Write the system of linear equations as e(k)*C(k)=Ai
+
+A=[11300 8150 4500 4000;
+    5000  7500 3650 4200;
+    1900  3900 3000 4800;
+    1500  1400 2000 4850];
+
+b=[0.6320; 0.5345; 0.3310; 0.1960];
+
+
+% Gauss-Jordan method to solve for concentrations
+L = rref(A); % returns the reduced row echelon form of A
+concentrations = rref([A,b]); % converts the augmented matrix into reduced row echelon form 
+concentrations = concentrations(:, end); % Extracts the last column from the result, which contains the values of the concentrations
+
+
+disp(concentrations);
+
+% The Jacobi method is an iterative technique used to solve systems of linear equations. 
+% It works by updating each variable independently using the current estimates of the other variables. 
+% The method proceeds iteratively until the solution converges 
+% (i.e., changes between iterations are smaller than the tolerance).
+
+
+
+A=[11300 8150 4500 4000;
+    5000  7500 3650 4200;
+    1900  3900 3000 4800;
+    1500  1400 2000 4850];
+
+b=[0.6320; 0.5345; 0.3310; 0.1960];
+
+
+
+
+tol=0.00001; % defines how close the solution needs to be bewtween iterations for the algorithm to stop
+max_iterations=10; % if the solution does not converge within 500 iterations, the loop will stop
+n=length(b); % stores the number of variables (the 4 amino acids)
+x=(concentrations); % use these to confirm that code is right but jacobi method did not work because points diverge
+
+x_new = x;
+
+% Iterate using the Jacobi method
+for k = 1:max_iterations % runs the loop up to the number of max iterations    
+   % store the updated values for each varibale after each of the 500 iterations
+    
+    % Perform the Jacobi iteration for each unknown
+    % for each unknown, the sum is computed for all values when j does not equal i
+    for i = 1:n 
+        sum = 0;
+        for j = 1:n
+            if j ~= i
+                sum = sum + A(i,j).*x(j);
+            end
+        end
+        
+        % use the Jacobi formula to update xi in the new solution
+        x_new(i) = (b(i) - sum)./A(i,i);
+    end
+    
+    % if the difference between the new and previous solutions is less than the tolerance, the loop breaks
+    if abs(x_new - x) < tol % computes the maximum absolute difference between old and new solutions
+        break;
+    end
+    
+    % Update the old solution for the next iteration
+    x = x_new;
+end
+
+% Display the final concentrations
+disp('Concentrations of the four amino acids:');
+disp(x);
+
+
