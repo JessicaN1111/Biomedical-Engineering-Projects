@@ -1,0 +1,59 @@
+% Create a table with the provided data; input all of the data.
+Study_ID=[13267033;18927460;12666831;19931878;11189371];
+Gender=["Female";"Female";"Male";"Female";"Male"];
+Age=[51;37;66;27;40];
+Diet=["Poor";"Good";"Poor";"Medium";"Good"];
+Lifestyle=["Normal";"Normal";"Sedentary";"Active";"Normal"];
+Cholesterol=[5.5;4.2;6.0;3.6;4.8]; %mmol/liters
+
+% Create the table.
+dataTable=table(Study_ID,Gender,Age,Diet,Lifestyle,Cholesterol)
+
+% Compute the risk scores for each patient and add as a new column in the
+% table.
+
+% Initialize the risk score array
+riskScore=100*ones(height(dataTable), 1); % Start with a score of 100 for each; one column
+
+% Apply the diet adjustments
+for i=1:height(dataTable)
+    if dataTable.Diet(i)=="Good"
+        riskScore(i)=riskScore(i)-20; % Subtract 20 for Good diet
+    elseif dataTable.Diet(i)=="Medium"
+        riskScore(i)=riskScore(i)-10; % Subtract 10 for Medium diet
+    end
+end
+
+
+% Apply the lifestyle adjustments
+for i=1:height(dataTable)
+    if dataTable.Lifestyle(i)=="Active"
+        riskScore(i)=riskScore(i)-20; % Subtract 20 for Active lifestyle
+    elseif dataTable.Lifestyle(i)=="Normal"
+        riskScore(i)=riskScore(i)-10; % Subtract 10 for Normal lifestyle
+    end
+end
+
+% Apply the age adjustment
+for i = 1:height(dataTable)
+    riskScore(i)=riskScore(i)-(100-dataTable.Age(i))/2;
+end
+
+
+% Apply the cholesterol adjustment
+for i=1:height(dataTable)
+    if dataTable.Cholesterol(i)<=5
+        riskScore(i)=riskScore(i)-10;
+    end
+end
+
+
+% Add the riskScore as a new column in the dataTable
+dataTable.RiskScore=riskScore
+
+
+%Filter out participants with a risk score greater than 60
+filteredTable=dataTable(dataTable.RiskScore<=60, :); %use logical indexing 
+
+% Display the final table with only included participants
+disp('Table of participants with risk scores 60 or less:'); disp(filteredTable);
