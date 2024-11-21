@@ -1,0 +1,487 @@
+% Load Excel data.
+filename ='Book1_angle.xlsx'; % Replace with your file name
+data_original=readmatrix(filename); % Reads the Excel sheet into a matrix
+
+% Identify rows that contain NaN or -1 and remove them.
+rows_to_remove=any(isnan(data_original)|data_original==-1, 2); % check for NaN or -1 in each row, returning true for the row if either value is found
+% Remove those rows
+data=data_original(~rows_to_remove, :); % select all rows from data marked as false (the rows we want to keep) and keep all columns
+
+% (a)------------------------------------------------------------------------------
+% Adjust the coordinate system.
+
+% Extract Y coordinates for all points (from columns 4, 6, 8, ..., 18).
+y_coords_all = data(:, [4, 6, 8, 10, 12, 14, 16, 18]);
+
+% Find the minimum and maximum y-values across all points.
+min_y=min(y_coords_all(:)); % Minimum y-value (top of the image)
+max_y=max(y_coords_all(:)); % Maximum y-value (bottom of the image)
+
+% Estimate the image height as the range of y-values.
+estimated_image_height=max_y-min_y;
+% Adjust the coordinate system using the estimated image height. 
+data(:, [4, 6, 8, 10, 12, 14, 16, 18])=estimated_image_height-data(:, [4, 6, 8, 10, 12, 14, 16, 18]);
+
+% Extract the first frame (first row).
+frame_1=data(1, :);
+
+% Create a scatter plot of the first frame
+x_coords=frame_1([3, 5, 7, 9, 11, 13, 15, 17]);
+y_coords=frame_1([4, 6, 8, 10, 12, 14, 16, 18]);
+figure;
+scatter(x_coords,y_coords);
+title('First Frame Scatter Plot (Frame 0)');
+xlabel('X (pixels)');
+ylabel('Y (pixels, inverted)');
+grid on
+
+% (b)-------------------------------------------------------------------------------
+% Plot of the motion of each point
+
+% Extract X and Y coordinates for all frames
+x_coords_all=data(:, [3, 5, 7, 9, 11, 13, 15, 17]);
+y_coords_all=data(:, [4, 6, 8, 10, 12, 14, 16, 18]);
+
+figure;
+hold on;
+for i=1:8 % for each of the 8 features
+    plot(x_coords_all(:, i),y_coords_all(:, i));
+end
+
+% Set limits for the axes to match the skull image dimensions
+% Give 50 units above and below to visualize better
+xlim([min(x_coords_all(:))-50, max(x_coords_all(:))+50]);
+ylim([min(y_coords_all(:))-50, max(y_coords_all(:))+50]);
+
+hold off;
+title('Motion of Each Point');
+xlabel('X (pixels)');
+ylabel('Y (pixels, inverted)');
+legend('Feature 1', 'Feature 2','Feature 3','Feature 4','Feature 5','Feature 6','Feature 7','Feature 8')
+
+% (c)-------------------------------------------------------------------------------
+% Calculate the angle between points 1 and 2 for all frames
+
+% Extract X and Y coordinates for points 1 and 2 for all frames
+x_point1 = x_coords_all(:, 1); % X coordinates of point 1
+y_point1 = y_coords_all(:, 1); % Y coordinates of point 1
+x_point2 = x_coords_all(:, 2); % X coordinates of point 2
+y_point2 = y_coords_all(:, 2); % Y coordinates of point 2
+
+
+% Initialize an array to store angles
+angles=zeros(size(data, 1), 1); % for all 730 times points; just want one column
+
+% Calculate the angles
+for t=1:size(data, 1) % loop 730 times
+    % Calculate the difference vector
+    delta_x=x_point2(t)-x_point1(t); % Change in X
+    delta_y=y_point2(t)-y_point1(t); % Change in Y
+    % Calculate the angle in radians
+    angles(t)=atan2(delta_y, delta_x); % Angle in radians
+end
+
+angles=rad2deg(angles); %convert to degrees
+
+% Display the angle differences with corresponding time points
+fprintf('Time Point\tAngle (Degrees)\n');for t = 1:size(data, 1)
+    time_point = data(t, 2); % Because the time is stored in the second column of the data
+    fprintf('%.5f\t\t%.4f\n', time_point, angles(t)); % Displaying with 5 decimal places for time and 4 for angles
+end
+
+
+% (d)--------------------------------------------------------------------------------
+% Deduct the angle of each time point from the angle at first frame.
+% Calculate angular deformation.
+initial_angle=angles(1); % Angle at the first frame
+angular_deformation=initial_angle-angles; % Deduct angle at each time point from angle at first frame
+
+fprintf('Time Point\tAnglular Deformation (Degrees)\n');for t = 1:size(data, 1)
+    time_point = data(t, 2); % Because the time is stored in the second column of the data
+    fprintf('%.5f\t\t%.4f\n', time_point, angular_deformation(t)); % Displaying with 5 decimal places for time and 4 for angles
+end
+
+% (e)----------------------------------------------------------------
+% plot angular deformation versus time.
+
+time=data(:, 2); % Time column
+
+figure;
+plot(time, angular_deformation);
+title('Angular Deformation vs. Time');
+xlabel('Time (seconds)');
+ylabel('Angular Deformation (Degrees)');
+
+% (f)----------------------------------------------------------------
+% Determine rise time and maximum angle.
+
+[max_angle, max_index]=max(angular_deformation); % Find the maximum angle and its index
+
+% Find time for deformation to get from 10% to 90% of maximum (rise time)
+ten_percent=.1*max_angle;
+ninety_percent=.9*max_angle;
+
+% Find the first index where deformation reaches 10% of the maximum
+idx_10=find(angular_deformation>=ten_percent,1,'first');
+    
+% Find the first index where deformation reaches 90% of the maximum
+idx_90=find(angular_deformation>=ninety_percent,1,'first');
+
+
+% Calculate the rise time as the time difference between the 90% and 10% points
+rise_time=time(idx_90)-time(idx_10);
+% Display results
+fprintf('Maximum Angular Deformation: %.4f degrees\n', max_angle);fprintf('Rise Time: %.5f seconds\n', rise_time);
+
+% (g)-----------------------------------------------------------------
+
+% The speed of deformation is the change in angle divided by the change in
+% time.
+
+change_angle=angular_deformation(idx_90)-angular_deformation(idx_10);
+neck_deformation_speed=change_angle/rise_time;
+fprintf('Neck deformation speed: %.4f degrees/second\n', neck_deformation_speed)
+
+
+% (h)----------------------------------------------------------
+
+% Fit different polynomial models to the data
+p1=polyfit(time,angular_deformation,1); % linear
+p2=polyfit(time,angular_deformation,2); % quadratic
+p3=polyfit(time,angular_deformation,3); % cubic
+p4=polyfit(time,angular_deformation,4); % quartic
+
+% Calculate the predicted y values from the polynomial models 
+x1=polyval(p1,time);
+x2=polyval(p2,time);
+x3=polyval(p3,time);
+x4=polyval(p4,time);
+
+% Plot the fitted curves with the original data 
+figure;
+hold on
+plot(time,angular_deformation,'DisplayName', 'Original Data' )
+plot(time, x1, 'r-', 'DisplayName', 'Linear Fit'); % Linear fit
+plot(time, x2, 'g-', 'DisplayName', 'Quadratic Fit'); % Quadratic fit
+plot(time, x3, 'b-', 'DisplayName', 'Cubic Fit'); % Cubic fit
+plot(time, x4, 'm-', 'DisplayName', 'Quartic Fit'); % Quartic fit
+
+% Customize the fitted plot
+xlabel('Time (s)');
+ylabel('Angular Deformation');
+title('Fitted Polynomial Curves');
+legend('show'); 
+grid on;
+hold off; 
+mdl3=fitlm(time,angular_deformation, 'poly3') % Cubic model
+mdl4=fitlm(time,angular_deformation, 'poly4') % Quartic model
+
+% Plot the best curve with the original data
+figure;
+hold on
+plot(time,angular_deformation,'DisplayName', 'Original Data' )
+plot(time, x4, 'm-', 'DisplayName', 'Quartic Fit'); % Quartic fit
+% Customize the fitted plot
+xlabel('Time (s)');
+ylabel('Angular Deformation');
+title('Best Polynomial Curve (Fourth Order)');
+legend('show'); 
+grid on;
+hold off; 
+% In the quartic model, the RMSE and P value are the lowest, and the
+% F-statistic and r^2 value are the higest. I only performed fitlm on cubic and quartic
+% because visually the linear and quadratic fits looked horrible. The quartic model
+% also visually looks better than the cubic model. This is why I chose a fourth order polynomial.
+
+
+% (i)-----------------------------------------------------------------
+
+% Extract Y coordinates for point 4
+y_point4 = y_coords_all(:, 4); % Y coordinates of point 4
+time_points = data(:, 2); % Time points from the second column
+% Create a figure
+
+figure;
+% Plot the y-coordinate of point 4 against time
+plot(time_points, y_point4, 'b-'); 
+hold on;
+
+% Add grid and labels
+xlabel('Time (s)');
+ylabel('Y Coordinate of Point 4');
+title('Tracking Data of Point 4');
+grid on;
+
+
+% Extracting x and y coordinates for point 4
+x_point4 = x_coords_all(:, 4); % X coordinates of point 4
+y_point4 = y_coords_all(:, 4); % Y coordinates of point 4
+time_points = data(:, 2); % Time points from the second column
+
+% Calculate the change in position over time
+delta_x = diff(x_point4);
+delta_y = diff(y_point4);
+time_diff = diff(time_points);
+
+% Calculate velocity components
+velocity_x = delta_x./time_diff; % Velocity in X
+velocity_y = delta_y./time_diff; % Velocity in Y
+
+% Calculate the overall speed (magnitude of velocity)
+speed=sqrt(velocity_x.^2 + velocity_y.^2);
+
+% Plot the speed to identify impacts
+figure;
+plot(time_points(1:end-1), speed);
+xlabel('Time (s)');
+ylabel('Speed (pixels/s)');
+title('Speed of Point 4 Over Time');
+grid on;
+
+% Based on both of these graphs it looks like the second impact occurs at
+% around 0.093 seconds (I found the data point by clicking on the graph). 
+% The Y tracking data and the speed both noticeably change at this time.
+% The first impact looks to occur a little after 0.06s. 
+
+% Limit data to before this time point
+% Define the time threshold
+time_threshold = 0.093;
+
+% Create a logical index for time points less than the threshold
+index_before_threshold=data(:, 2) < time_threshold;
+
+% Limit the data to only include entries before the threshold
+limited_data = data(index_before_threshold, :);
+x_coords_new=limited_data(:, [3, 5, 7, 9, 11, 13, 15, 17]);
+y_coords_new=limited_data(:, [4, 6, 8, 10, 12, 14, 16, 18]);
+time_new=limited_data(:, 2);
+
+
+% (j)---------------------------------------------------------------------
+% Calculate the distance between the following points for every frame. 
+% (1,2), (1,3), (1,4), (1,5), (1,6), (1,7), (1,8) and call them "fixed".
+
+x_point1=x_coords_new(:, 1); % X coordinates of point 1
+y_point1=y_coords_new(:, 1); % Y coordinates of point 1
+
+% Initialize array to store distances.
+fixed_distances=zeros(size(x_coords_new, 1), 7); % 7 distances for points 2 to 8
+
+% Calculate the distances
+for i = 2:8
+    x_other=x_coords_new(:,i); % X coordinates of the other points
+    y_other=y_coords_new(:,i); % Y coordinates of the other points
+    
+    % Calculate the distance using the Euclidean distance formula
+    fixed_distances(:, i - 1) =sqrt((x_other-x_point1).^2+(y_other-y_point1).^2);
+end
+ 
+fixed_distances % Fixed distances between (1,2), (1,3), (1,4), (1,5), (1,6), (1,7), (1,8) for each frame
+
+% (k)------------------------------------------------------------------------------
+% Calculate the distance between the following points for every frame
+% (3,4), (4,5), (5,6), (6,7), (7,8) and call them relative. 
+
+% Extract X and Y coordinates for points 3 to 8
+x_point3 = x_coords_new(:, 3);
+y_point3 = y_coords_new(:, 3);
+x_point4 = x_coords_new(:, 4);
+y_point4 = y_coords_new(:, 4);
+x_point5 = x_coords_new(:, 5);
+y_point5 = y_coords_new(:, 5);
+x_point6 = x_coords_new(:, 6);
+y_point6 = y_coords_new(:, 6);
+x_point7 = x_coords_new(:, 7);
+y_point7 = y_coords_new(:, 7);
+x_point8 = x_coords_new(:, 8);
+y_point8 = y_coords_new(:, 8);
+
+% Initialize an array to store relative distances
+relative_distances=zeros(size(limited_data, 1),5); % 5 distances that we want
+
+% Calculate the relative distances
+relative_distances(:, 1) = sqrt((x_point4 - x_point3).^2 + (y_point4 - y_point3).^2); % Distance between points 3 and 4
+relative_distances(:, 2) = sqrt((x_point5 - x_point4).^2 + (y_point5 - y_point4).^2); % Distance between points 4 and 5
+relative_distances(:, 3) = sqrt((x_point6 - x_point5).^2 + (y_point6 - y_point5).^2); % Distance between points 5 and 6
+relative_distances(:, 4) = sqrt((x_point7 - x_point6).^2 + (y_point7 - y_point6).^2); % Distance between points 6 and 7
+relative_distances(:, 5) = sqrt((x_point8 - x_point7).^2 + (y_point8 - y_point7).^2); % Distance between points 7 and 8
+
+relative_distances % Relative distances between (3,4), (4,5), (5,6), (6,7), (7,8) for each frame
+
+% (l)------------------------------------------------------------------------------
+% Calculate initial lengths at the first frame
+initial_fixed_lengths=fixed_distances(1, :); % want the values from the first row
+% Calculate deformation for all frames using the formula
+fixed_deformations=(initial_fixed_lengths-fixed_distances)./initial_fixed_lengths % deformations between (1,2), (1,3), (1,4), (1,5), (1,6), (1,7), (1,8) for each frame
+
+% (m)------------------------------------------------------------------------------
+% Calculate initial lengths at the first frame
+initial_relative_lengths=relative_distances(1, :); % want the values from the first row
+% Calculate deformation for all frames using the formula
+relative_deformations=(initial_relative_lengths-relative_distances)./initial_relative_lengths
+
+% (n)------------------------------------------------------------------------------
+% Plot the deformations
+
+figure;
+hold on;
+
+% Plot Fixed Deformations
+plot(fixed_deformations(:, 1), 'DisplayName', '(1,2)');
+plot(fixed_deformations(:, 2), 'DisplayName', '(1,3)');
+plot(fixed_deformations(:, 3), 'DisplayName', '(1,4)');
+plot(fixed_deformations(:, 4), 'DisplayName', '(1,5)');
+plot(fixed_deformations(:, 5), 'DisplayName', '(1,6)');
+plot(fixed_deformations(:, 6), 'DisplayName', '(1,7)');
+plot(fixed_deformations(:, 7), 'DisplayName', '(1,8)');
+xlabel('Frame Number');
+ylabel('Deformation');
+title('Deformation Data for Fixed Deformations');
+grid on;
+legend
+hold off
+
+figure;
+hold on
+% Plot Relative Deformations
+plot(relative_deformations(:, 1), 'DisplayName', '(3,4)');
+plot(relative_deformations(:, 2), 'DisplayName', '(4,5)');
+plot(relative_deformations(:, 3), 'DisplayName', '(5,6)');
+plot(relative_deformations(:, 4), 'DisplayName', '(6,7)');
+plot(relative_deformations(:, 5), 'DisplayName', '(7,8)');
+xlabel('Frame Number');
+ylabel('Deformation');
+title('Deformation Data for Relative Deformations');
+legend
+hold off
+% (o1)------------------------------------------------------------------------------
+
+% I select the (1,2) deformation for fixed 
+
+plot(fixed_deformations(:, 1))
+xlabel('Frame Number');
+ylabel('Deformation');
+title('Fixed Deformation Data for (1,2)');
+
+
+% Butterworth Filtering
+% I felt this was necessary since there was so much noise in the data. 
+% We just want to find peaks, so I didn't think the filtering would exclude
+% any important harmonics.
+% Extract deformation data for pair (1,2) in fixed group
+fixed_deformation_12 = fixed_deformations(:, 1); % (1,2) corresponds to column 1
+
+% Define filter parameters (Butterworth low-pass filter)
+fs = 1 / mean(diff(time_new)); % Sampling frequency 
+fc = 50; % Cutoff frequency in Hz; i chose this because I felt like it preserved the most important peaks
+[b, a] = butter(2, fc / (fs / 2)); % 2nd order Butterworth filter
+
+% Apply Butterworth filter
+filtered_fixed_deformation_12 = filtfilt(b, a, fixed_deformation_12);
+
+% Plot the filtered acceleration data
+figure;
+plot(time_new, filtered_fixed_deformation_12);
+xlabel('Time (s)');
+ylabel('Filtered Fixed Deformation Data for (1,2)');
+title('Filtered Fixed Deformation Data for (1,2) vs. Time');
+grid on;
+% Perform FFT on filtered deformation data
+% Extract the length of the filtered data
+L=length(filtered_fixed_deformation_12);
+
+% Perform Fast Fourier Transform (FFT)
+Y=fft(filtered_fixed_deformation_12);
+
+% Compute the two-sided amplitude spectrum
+A2=abs(Y/L);
+
+% Extract the single-sided amplitude spectrum (because FFT is symmetric)
+A1=A2(1:L/2+1);
+
+% Adjust amplitude values for the single-sided spectrum
+A1(2:end-1)=2*A1(2:end-1);
+
+% Create the frequency vector corresponding to the FFT results
+f=fs*(0:(L/2))/L;
+
+% Plot the single-sided amplitude spectrum to visualize dominant frequencies
+figure;
+plot(f, A1);
+title('Single-Sided Amplitude Spectrum of Filtered Fixed Deformation Data (1,2)');
+xlabel('Frequency (Hz)');
+ylabel('Amplitude');
+grid on;
+% To visualize the graph/peaks better
+xlim([0 200]); 
+ylim([0 0.004]);
+
+% (o2)------------------------------------------------------------------------------
+
+% I select the (4,5) deformation for relative 
+
+plot(relative_deformations(:, 2))
+xlabel('Frame Number');
+ylabel('Deformation');
+title('Relative Deformation Data for (4,5)');
+
+% Butterworth Filtering
+% Extract deformation data for pair (1,2) in fixed group
+relative_deformation_45 = relative_deformations(:, 2); % (4,5) corresponds to column 2
+
+% Define filter parameters (Butterworth low-pass filter)
+fs = 1 / mean(diff(time_new)); % Sampling frequency 
+fc = 50; % Cutoff frequency in Hz; preserved peaks
+[b, a] = butter(2, fc / (fs / 2)); % 2nd order Butterworth filter
+
+% Apply Butterworth filter
+filtered_relative_deformation_45 = filtfilt(b, a, relative_deformation_45);
+
+% Plot the filtered acceleration data
+figure;
+plot(time_new, filtered_relative_deformation_45);
+xlabel('Time (s)');
+ylabel('Filtered Relative Deformation Data for (4,5)');
+title('Filtered Relative Deformation Data for (4,5) vs. Time');
+grid on;
+% Perform FFT on filtered deformation data
+% Extract the length of the filtered data
+L=length(filtered_relative_deformation_45);
+
+% Perform Fast Fourier Transform (FFT)
+Y=fft(filtered_relative_deformation_45);
+
+% Compute the two-sided amplitude spectrum
+A2=abs(Y/L);
+
+% Extract the single-sided amplitude spectrum (because FFT is symmetric)
+A1=A2(1:L/2+1);
+
+% Adjust amplitude values for the single-sided spectrum
+A1(2:end-1)=2*A1(2:end-1);
+
+% Create the frequency vector corresponding to the FFT results
+f=fs*(0:(L/2))/L;
+
+% Plot the single-sided amplitude spectrum to visualize dominant frequencies
+figure;
+plot(f, A1);
+title('Single-Sided Amplitude Spectrum of Relative Fixed Deformation Data (4,5)');
+xlabel('Frequency (Hz)');
+ylabel('Amplitude');
+grid on;
+% To visualize the graph/peaks better
+xlim([0 200]);
+ylim([0 0.015]);
+
+
+% Both of the single-sided amplitude graphs show the significant frequency components of the 
+% deformation data for each pair, with peaks around 40 Hz and 60 Hz. These indicate that 
+% the deformation involves faster oscillations at these frequencies, which could correspond 
+% to quicker, more localized movements within the material/tissue after the impact. 
+% The primary peak around 40 Hz represents the dominant mode of angular deformation, 
+% indicating larger-scale motion, while the second peak near 60 Hz likely represents secondary 
+% oscillations. This might reflect residual vibrations or localized tissue movements that occur
+% after the primary motion. The reduced amplitude at higher frequencies suggests that very rapid, 
+% high-frequency deformations contribute less to the overall deformation, indicating that the system's 
+% response is primarily driven by oscillations in the 40–60 Hz range.
