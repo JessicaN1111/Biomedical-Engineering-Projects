@@ -1,0 +1,168 @@
+% load the file
+load data_for_fourrier_analysis.mat
+
+% (A)
+% plot angular velocity in Z direction vs time
+% use dot notation to access specific variables within the timetable
+figure;
+plot(AngularVelocity.Timestamp, AngularVelocity.Z);
+xlabel('Time');
+ylabel('Angular Velocity (Z direction)');
+title('Angular Velocity in Z Direction vs Time');
+grid on;
+
+
+% (B)
+
+% Clean the data and remove the non-cyclic portion at the start and at the end
+% I am going manually select indices based on observation and will remove the intial and ending sections that are not cyclic
+
+% I found the Y coordinates on the graph that I wanted for the range and found their indices
+find(AngularVelocity.Z==0.501367)
+find(AngularVelocity.Z==0.246637)
+
+% Selects rows 515 to 1749 from timetable and includes all columns
+% New variable stores cleaned portion
+cleanedData = AngularVelocity(515:1749, :);
+time = seconds(cleanedData.Timestamp - cleanedData.Timestamp(1)); % convert to time vector that starts from 0
+angular_velocity_z=cleanedData.Z;
+
+
+% Butterworth Filtering
+L=length(angular_velocity_z);
+Fs=L/(time(1235)-time(1)); % Sampling frequency 
+cutoff_freq=5; % Set cutoff frequency to 4 Hz; I experimented and liked this one (didn't want to lose harmonics)
+[b,a]=butter(2,cutoff_freq/(Fs/2)); % 2nd-order Butterworth filter
+% Apply the Butterworth filter to the angular velocity data
+filteredDataZ=filtfilt(b,a,angular_velocity_z); 
+
+% Plot the original vs filtered data
+figure;
+plot(cleanedData.Timestamp, cleanedData.Z, 'b'); hold on;
+plot(cleanedData.Timestamp, filteredDataZ, 'r', 'LineWidth', 1.5);
+xlabel('Time');
+ylabel('Angular Velocity (Z direction)');
+title('Original vs Filtered Angular Velocity (Z direction)');
+legend('Original', 'Filtered');
+grid on;
+
+
+
+% (C)
+
+% Fit a Fourier series to the cleaned data
+% To select the appropriate order, we can use the Fourier series function fit and RMSE values
+
+% Fourier2 Fit
+f2=fit(time,filteredDataZ,'fourier2');
+figure;
+plot(f2, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 2 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data2 = feval(f2, time);
+rmse_value2 = sqrt(mean((fitted_data2 - filteredDataZ).^2))
+
+
+% Fourier3 fit
+f3 = fit(time, filteredDataZ, 'fourier3');
+figure;
+plot(f3, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 3 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data3 = feval(f3, time);
+rmse_value3 = sqrt(mean((fitted_data3 - filteredDataZ).^2))
+
+% Fourier4 fit
+f4 = fit(time,filteredDataZ,'fourier4');
+figure;
+plot(f4, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 4 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data4= feval(f4, time);
+rmse_value4 = sqrt(mean((fitted_data4 - filteredDataZ).^2))
+
+% Fourier5 fit
+f5 = fit(time, filteredDataZ, 'fourier5');
+figure;
+plot(f5, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 5 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data5= feval(f5, time);
+rmse_value5 = sqrt(mean((fitted_data5 - filteredDataZ).^2))
+
+% Fourier6 fit
+f6 = fit(time, filteredDataZ, 'fourier6');
+figure;
+plot(f6, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 6 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data6 = feval(f6, time);
+rmse_value6 = sqrt(mean((fitted_data6 - filteredDataZ).^2))
+
+
+% Fourier7 fit
+f7 = fit(time, filteredDataZ, 'fourier7');
+figure;
+plot(f7, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 7 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data7 = feval(f7, time);
+rmse_value7 = sqrt(mean((fitted_data7 - filteredDataZ).^2))
+
+% Fourier8 fit
+f8 = fit(time, filteredDataZ, 'fourier8');
+figure;
+plot(f8, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Fourier Series Fit 8 of Filtered Angular Velocity in Z direction');
+grid on;
+fitted_data8 = feval(f8, time);
+rmse_value8 = sqrt(mean((fitted_data8 - filteredDataZ).^2))
+
+
+orders = [2, 3, 4, 5, 6, 7, 8];
+rmse_values = [rmse_value2, rmse_value3, rmse_value4, rmse_value5, rmse_value6, rmse_value7, rmse_value8];
+figure;
+plot(orders, rmse_values, '-o');
+xlabel('Fourier Order');
+ylabel('RMSE');
+title('RMSE vs Fourier Series Order');
+grid on;
+f6 = fit(time, filteredDataZ, 'fourier6');
+figure;
+plot(f6, time, filteredDataZ);
+xlabel('Time (s)');
+ylabel('Angular Velocity (Z direction)');
+title('Best Fourier Fit (6)');
+grid on;
+
+% (D)
+
+% Calculate Mean Angular Velocity (using the filtered data)
+mean_angular_velocity=mean(filteredDataZ)
+
+% Calculate Amplitude
+amplitude=(max(filteredDataZ)-min(filteredDataZ))/2
+
+% Calculate Period (based on peak detection)
+% Find peaks to estimate the period; store indices
+[peaks,locs]=findpeaks(filteredDataZ, 'MinPeakProminence', 0.5); %ensures that only significant peaks are detected
+% locs gives the index of the peaks; convert this to time
+peak_times = time(locs);
+% Calculate time differences between consecutive peaks
+periods = diff(peak_times); 
+% Calculate average period (assuming your signal is periodic)
+mean_period = mean(periods)
