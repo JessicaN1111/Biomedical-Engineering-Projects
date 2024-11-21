@@ -1,0 +1,103 @@
+% Define the function 
+f2=@(x)7*sin(x).*exp(-x/4)-1;
+
+% Define the range
+x2=linspace(0,20,1000);
+y2=f2(x2);
+
+% Plot the function
+figure;
+plot(x2, y2);
+hold on;
+yline(0,'k-');
+xlabel('x2');
+ylabel('f2(x2)');
+title('Plot of f2(x2)');
+grid on;
+hold off
+% The function cross the line at f2(x2)=0 4 times. So this function has 4
+% roots in the range (0,20).
+
+
+% Determine the positive lowest root graphically
+initial_guess=0.1;
+root2=fzero(f2,initial_guess)
+% The lowest root graphically is at x=0.1488
+
+
+
+% Determine the positive lowest root using the newton-raphson method
+% Define the derivative
+f2_derivative=@(x)7*cos(x).*exp(-x/4)-(7/4)*sin(x).*exp(-x/4);
+
+x0=0; % initial guess
+tol=0.00001;
+max_iter=1000;
+
+for i=1:max_iter
+    x1=x0-f2(x0)/f2_derivative(x0); %newton-raphson formula
+    if abs(x1-x0)<tol
+        break;
+    end
+    x0=x1; % update guess
+end
+
+fprintf('Lowest root found using Newton-Raphson: x = %.6f\n', x1);
+
+% Determine the positive lowest root using the secant method
+xi=0; % initial guess
+xi2=1; %second initial guess
+
+for i=1:max_iter
+    x2=xi2-f2(xi2)*(xi2-xi)/(f2(xi2)-f2(xi)); % secant formula 
+    if abs(x2-xi2)<tol
+        break;
+    end
+    xi=xi2;
+    xi2=x2;
+end
+
+fprintf('Lowest root found using Secant Method: x = %.6f\n', x2);
+
+
+% Determine the second positive root using the bisection method.
+% Define interval for second root (can visualize the interval that the
+% second root will fall in from the graph).
+a = 2;
+b = 3;
+tolerance = 0.000001;
+max_iter = 10000;
+
+% Bisection Method
+for i=1:max_iter
+    c=(a+b)/2; % find the midpoint
+    if abs(f2(c))<tolerance||(b - a)/2< tolerance % check for convergence
+        break;
+    elseif sign(f2(a))*sign(f2(c))< 0; % if f(a) and f(c) have opposite signs, the root lies in [a,c]
+        b = c;
+    else
+        a = c;
+    end
+end
+fprintf('Second positive root using Bisection Method: x = %.6f\n', c);
+
+
+% Second positive root using false positioning
+% Define interval for false position
+a = 2;
+b = 3;
+tolerance=0.000001;
+max_iter=10000;
+
+% False Position Method
+for i=1:max_iter
+    c=b-f2(b)*(b-a)/(f2(b)-f2(a)); % estimates the root using a linear interpolation between a and b
+    if abs(f2(c))<tolerance
+        break;
+    elseif sign(f2(a))*sign(f2(c))<0 % update the interval based on where the sign change is detected
+        b=c;
+    else
+        a=c;
+    end
+end
+fprintf('Second positive root using False Position Method: x = %.6f\n', c);
