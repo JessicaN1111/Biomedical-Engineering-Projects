@@ -1,0 +1,164 @@
+% (a)------------------------------------------------------------------------------
+% Convert the character array into numeric then plot the radial displacement data to all 17 segments. 
+for i=1:17
+    load(['radial',num2str(i),'.mat']); % load all 17 radial files
+    % Convert the character arrays to numeric.
+    % Store in cell arrays at the position corresponding to the current
+    % value of i.
+    radial_numeric{i} = str2num(radial); 
+    t_numeric{i} = str2num(t); 
+end
+
+% Plot the radial displacement data of all 17 segments
+figure;
+hold on;
+for i=1:17 %loop through the numeric radial displacements and plot them against time for 17 segments
+    plot(t_numeric{i}, radial_numeric{i});
+end
+hold off;
+xlabel('Time (ms)');
+ylabel('Radial Displacement (mm)');
+title('Radial Displacement for 17 Myocardial Segments');
+legend('Segment 1', 'Segment 2','Segment 3','Segment 4','Segment 5','Segment 6','Segment 7','Segment 8','Segment 9','Segment 10','Segment 11','Segment 12','Segment 13','Segment 14','Segment 15','Segment 16','Segment 17')
+
+
+% (b)-----------------------------------------------------------------------------------
+% Determine the rise time for each segment and maximum displacement for each segment.
+max_disp = zeros(1, 17); % Preallocate for maximum displacements
+rise_time = zeros(1, 17); % Preallocate for rise times
+
+for i=1:17
+    max_disp(i)=max(radial_numeric{i}); % maximum displacement for each segment
+
+    % Rise time is defined as the time it takes for the displacement to go from 10% to 90% of its maximum value.
+    % Did some research and found that this is how engineers calculate rise time.
+    % Find 10% and 90% of max displacement.
+    ten_percent=.1*max_disp(i);
+    ninety_percent=.9*max_disp(i);
+
+    % Find the first index where displacement reaches 10% of the maximum
+    idx_10=find(radial_numeric{i}>=ten_percent,1,'first');
+    
+    % Find the first index where displacement reaches 90% of the maximum
+    idx_90=find(radial_numeric{i}>=ninety_percent,1,'first');
+    
+    % Calculate the rise time as the time difference between the 90% and 10% points
+    rise_time(i)=t_numeric{i}(idx_90)-t_numeric{i}(idx_10);
+end
+
+% Neatly display the results
+fprintf('Segment | Max Displacement (mm) | Rise Time (ms)\n');for i = 1:17
+    fprintf('%7d | %20.2f | %15.2f\n', i, max_disp(i), rise_time(i));
+end
+
+
+% (c)------------------------------------------------------------------------------------
+% Find segments with the same rise time
+
+% Store the unique rise time values and the indices of the unique rise
+% times for each element in rise_time.
+% ~ would give the index of the unique rise time in the original array
+% which is not used.
+[unique_rise_times, ~, rise_time_indices] = unique(rise_time); % Unique returns same data as in rise_times but with no repetitions 
+segments_with_same_rise_time = cell(length(unique_rise_times), 1); % Preallocate a cell with 4 rows (the amount of unique rise times)
+
+% Loop that iterates over each unique rise time to find and store segments
+% with the same rise time.
+for j=1:length(unique_rise_times)
+    segments_with_same_rise_time{j}=find(rise_time_indices==j); % find the indices that match the current loop index j and store
+end
+
+% Display results
+for j=1:length(unique_rise_times)
+    % Display each unique rise time and the corresponding segments it shows
+    % up in. Convert the array of segments into string format.
+    fprintf('Rise time %.2f ms corresponds to segments: %s\n',unique_rise_times(j),mat2str(segments_with_same_rise_time{j}));
+end
+
+% (d)----------------------------------------------------------------------------
+% Which segment is the fastest? Which segment is the slowest and what's the average speed?  
+
+speed=zeros(1,17); % Preallocate for speeds
+
+for i=1:17
+    % Calculate speed as maximum displacement divided by rise time
+    speed(i)=max_disp(i)/rise_time(i); % Speed in mm/ms
+end
+
+% Find the segment with maximum speed
+[max_speed,max_index]=max(speed); % max_index will give the segment number
+% Find the segment with minimum speed
+[min_speed,min_index]=min(speed); % min_index will give the segment number
+
+% Display results
+fprintf('Segment with maximum speed: %d with speed %.6f mm/ms\n', max_index, max_speed);fprintf('Segment with minimum speed: %d with speed %.6f mm/ms\n', min_index, min_speed);
+% Calculate the average speed
+average_speed=mean(speed); % Average speed calculation
+fprintf('Average speed: %.6f mm/ms\n', average_speed);
+
+% (e)----------------------------------------------------------------------------
+% Fit a Fourier series into the fastest and slowest segment and calculate w, and time period T
+
+% Extract data for fastes and slowest segments
+fastest_segment_index=max_index;
+slowest_segment_index=min_index;
+
+t_fastest=t_numeric{fastest_segment_index}; % Time for fastest segment
+radial_fastest=radial_numeric{fastest_segment_index}; % Displacement for fastest segment
+t_slowest=t_numeric{slowest_segment_index}; % Time for slowest segment
+radial_slowest=radial_numeric{slowest_segment_index}; % Displacement for slowest segment
+
+% Ensure the variables are column vectors for the fit function
+t_fastest=t_fastest(:); 
+radial_fastest=radial_fastest(:); 
+t_slowest=t_slowest(:); 
+radial_slowest=radial_slowest(:); 
+
+% Fit Fourier series for the fastest segment using fourier2 (2 because the
+% data shows simple oscillatory behavior.
+f_fastest=fit(t_fastest,radial_fastest,'fourier2');
+
+% Plot the fit for the fastest segment
+figure;
+plot(f_fastest,t_fastest,radial_fastest);
+xlabel('Time (ms)');
+ylabel('Radial Displacement (mm)');
+title('Fourier Series Fit for Fastest Segment');
+grid on;
+% Extract the angular frequency (w) from the fitted model
+w_fastest=f_fastest.w;
+% Calculate the time period (T)
+T_fastest=2*pi/w_fastest;
+% Display results
+fprintf('Fastest Segment: w = %.4f, T = %.4f ms\n', w_fastest, T_fastest);
+
+% Fit Fourier series for the fastest segment using fourier2 (2 because the
+% data shows simple oscillatory behavior.
+f_slowest=fit(t_slowest,radial_slowest,'fourier2');
+
+% Plot the fit for the slowest segment
+figure;
+plot(f_slowest,t_slowest,radial_slowest);
+xlabel('Time (ms)');
+ylabel('Radial Displacement (mm)');
+title('Fourier Series Fit for Slowest Segment');
+grid on;
+
+% Extract the angular frequency (w) from the fitted model
+w_slowest = f_slowest.w;
+% Calculate the time period (T)
+T_slowest=2*pi/w_slowest;
+% Display results
+fprintf('Slowest Segment: w = %.4f, T = %.4f ms\n', w_slowest, T_slowest);
+
+% (f)--------------------------------------------------------------------------
+% How does w and T relate the average heart rate? 
+
+HR_fastest= 60000/T_fastest
+HR_slowest= 60000/T_slowest
+% w = 2pi/T
+% So, the heart rate increases as T decreases, and the heart rate increases
+% as w increases (the heart rate has an inverse relationship to T and a direct relationship to w). 
+% This makes sense because a faster heart rate means the 
+% heart is beating more times per minute, which happens when each beat takes 
+% less time to complete.
